@@ -27,6 +27,25 @@ class ScrapedPage:
     error: str = ""
 
 
+def load_processed_urls(ledger_path: Path) -> Dict[str, str]:
+    processed: Dict[str, str] = {}
+    if not ledger_path.exists():
+        return processed
+
+    for line in ledger_path.read_text(encoding="utf-8").splitlines():
+        if not line.strip():
+            continue
+        try:
+            row = json.loads(line)
+            url = row.get("url")
+            status = row.get("status", "")
+            if url:
+                processed[url] = status
+        except json.JSONDecodeError:
+            continue
+    return processed
+
+
 class TextExtractor(HTMLParser):
     def __init__(self) -> None:
         super().__init__(convert_charrefs=False)
@@ -136,6 +155,8 @@ def scrape_pages(
     limit: Optional[int] = None,
     dry_run: bool = False,
     same_host_only: bool = False,
+    resume: bool = False,
+    retry_failed: bool = False,
 ) -> Dict[str, Any]:
     manifest = {
         "source": cfg.source,
@@ -146,6 +167,7 @@ def scrape_pages(
         "status_counts": {"ok": 0, "skip": 0, "error": 0},
     }
 
+    log_message(paths.ingest_log, f"starting scrape for source={cfg.source} dataset={cfg.dataset} sitemap={cfg.sitemap_url}")
     sitemap_xml = fetch_sitemap_xml(cfg.sitemap_url, cfg.timeout_seconds)
     manifest["digest"] = sha1_hex(sitemap_xml)
     urls = parse_sitemap_urls(sitemap_xml)
@@ -153,9 +175,13 @@ def scrape_pages(
     if same_host_only:
         allowed_host = urlparse(cfg.sitemap_url).netloc.lower()
         urls = [u for u in urls if urlparse(u).netloc.lower() == allowed_host]
+        log_message(paths.ingest_log, f"same_host_only enabled; filtered urls to host={allowed_host}, count={len(urls)}")
 
     if limit is not None and limit > 0:
         urls = urls[:limit]
+        log_message(paths.ingest_log, f"applied limit={limit}; urls now={len(urls)}")
+
+    log_message(paths.ingest_log, f"sitemap parsed with {len(urls)} urls")
 
     manifest["url_count"] = len(urls)
     if dry_run:
@@ -163,10 +189,30 @@ def scrape_pages(
         return manifest
 
     if paths.urls_ledger.exists():
+        processed = load_processed_urls(paths.urls_ledger) if resume else {}
+    else:
+        processed = {}
+
+    if paths.urls_ledger.exists() and not resume:
         paths.urls_ledger.unlink()
 
     pages: List[ScrapedPage] = []
+    skipped_existing = 0
+    total_urls = len(urls)
     for i, url in enumerate(urls):
+        position = i + 1
+        log_message(paths.ingest_log, f"progress {position}/{total_urls}: fetching {url}")
+        previous_status = processed.get(url)
+        if previous_status in {"fetched", "fetched_empty"} or (previous_status == "failed" and not retry_failed):
+            skipped_existing += 1
+            if previous_status == "failed":
+                manifest["status_counts"]["error"] += 1
+                log_message(paths.ingest_log, f"progress {position}/{total_urls}: skipped already-failed {url}")
+            else:
+                manifest["status_counts"]["ok"] += 1
+                log_message(paths.ingest_log, f"progress {position}/{total_urls}: skipped already-done {url}")
+            continue
+
         if i > 0:
             time.sleep(max(0.0, cfg.delay_seconds))
 
@@ -236,7 +282,16 @@ def scrape_pages(
             )
             log_message(paths.ingest_log, f"fetched error: {url} :: {exc}")
 
+    log_message(paths.ingest_log, (
+        f"scrape complete for source={cfg.source}: "
+        f"ok={manifest['status_counts']['ok']} "
+        f"skip={manifest['status_counts']['skip']} "
+        f"error={manifest['status_counts']['error']} "
+        f"total={len(urls)}"
+    ))
+
     manifest["urls"] = urls
+    manifest["skipped_existing"] = skipped_existing
     return {
         **manifest,
         "pages": pages,

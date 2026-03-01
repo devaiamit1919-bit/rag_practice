@@ -42,6 +42,16 @@ python3 rag_playground.py ingest --dry-run --source selfstudys --dataset jee
 python3 rag_playground.py ingest --overwrite --run-id baseline_20260301
 ```
 
+Progress logging has been improved:
+- Each scrape step is now printed live to the terminal and appended to:
+  - `data/sources/<source>/<dataset>/logs/ingest.log`
+- You will also see progress entries like `progress 12/150: fetching ...` and final summary counts.
+
+If your Mac may enter sleep during long runs, use:
+```bash
+caffeinate -i python3 rag_playground.py ingest --source <source> --dataset <dataset>
+```
+
 3. Ask against default source+dataset:
 
 ```bash

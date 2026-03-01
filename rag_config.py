@@ -154,8 +154,10 @@ def resolve_dataset_config(
 
 def log_message(path: Path, message: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
+    line = f"{now_iso()} {message}\\n"
     with path.open("a", encoding="utf-8") as f:
-        f.write(f"{now_iso()} {message}\\n")
+        f.write(line)
+    print(line.strip())
 
 
 def append_jsonl(path: Path, payload: Dict[str, Any]) -> None:
