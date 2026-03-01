@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.py[cod]
+*.so
+*.egg-info/
+.Python
+.python-version
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.pyre/
+
+# macOS
+.DS_Store
+
+# local data (keep source artifacts if you want to track? adjust as needed)
+# data/sources/**/raw_pages/
+# data/sources/**/index/
+# data/sources/**/chunks/
+# data/sources/**/logs/
+# data/sources/**/manifest/
