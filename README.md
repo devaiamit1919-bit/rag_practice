@@ -52,6 +52,37 @@ If your Mac may enter sleep during long runs, use:
 caffeinate -i python3 rag_playground.py ingest --source <source> --dataset <dataset>
 ```
 
+## Ollama + Qwen setup (before query)
+
+Run these once before using `rag_query.py` with local LLM answers:
+
+1. Start Ollama service:
+```bash
+ollama serve
+```
+
+2. Pull the model used in this project:
+```bash
+ollama pull qwen3.5:9b
+```
+
+3. Quick health check:
+```bash
+curl -sS http://localhost:11434/api/tags
+```
+
+4. Optional model sanity check:
+```bash
+curl -sS http://localhost:11434/api/chat \
+  -H "Content-Type: application/json" \
+  -d '{"model":"qwen3.5:9b","messages":[{"role":"user","content":"hello"}],"stream":false}'
+```
+
+Before asking questions, make sure data pipeline is complete for your target source/dataset:
+- scrape/ingest data (`rag_playground.py ingest` or `rag_scraper.py`)
+- build embeddings/index (`rag_embedding_st.py` or `rag_reindex.py`)
+- then query (`rag_query.py`)
+
 3. Ask against default source+dataset:
 
 ```bash
@@ -89,6 +120,11 @@ python3 rag_query.py "What is JEE?" --enable-thinking
 - run smoke test without index files:
 ```bash
 python3 rag_query.py --smoke-test --ollama-model qwen3.5:9b
+```
+
+If your Mac may sleep during long query runs, keep the machine awake:
+```bash
+caffeinate -i python3 rag_query.py "What is JEE?"
 ```
 
 ## Adding a new sitemap source later
