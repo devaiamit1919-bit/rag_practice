@@ -24,6 +24,8 @@ class SourceConfig:
     chunk_chars: int
     overlap: int
     top_k: int
+    embedding_provider: str
+    embedding_model: str
 
 
 @dataclass
@@ -99,6 +101,7 @@ def parse_catalog(path: Path) -> Dict[str, Any]:
 
     fetch_cfg = dataset_cfg.get("fetch", {})
     chunk_cfg = dataset_cfg.get("chunking", {})
+    embedding_cfg = dataset_cfg.get("embedding", {})
 
     return {
         "default_source": default_source,
@@ -114,6 +117,8 @@ def parse_catalog(path: Path) -> Dict[str, Any]:
             chunk_chars=int(chunk_cfg.get("chunk_chars", 450)),
             overlap=int(chunk_cfg.get("overlap", 70)),
             top_k=int(dataset_cfg.get("top_k", 3)),
+            embedding_provider=str(embedding_cfg.get("provider", "tf")),
+            embedding_model=str(embedding_cfg.get("model", "sentence-transformers/all-MiniLM-L6-v2")),
         ),
     }
 
@@ -137,6 +142,7 @@ def resolve_dataset_config(
 
     fetch_cfg = dataset_data.get("fetch", {})
     chunk_cfg = dataset_data.get("chunking", {})
+    embedding_cfg = dataset_data.get("embedding", {})
     resolved_delay = ask_delay if ask_delay is not None else float(fetch_cfg.get("delay_seconds", 1.0))
 
     return SourceConfig(
@@ -149,6 +155,8 @@ def resolve_dataset_config(
         chunk_chars=int(chunk_cfg.get("chunk_chars", 450)),
         overlap=int(chunk_cfg.get("overlap", 70)),
         top_k=int(dataset_data.get("top_k", catalog["source_cfg"].top_k)),
+        embedding_provider=str(embedding_cfg.get("provider", "tf")),
+        embedding_model=str(embedding_cfg.get("model", "sentence-transformers/all-MiniLM-L6-v2")),
     )
 
 

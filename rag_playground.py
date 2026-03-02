@@ -13,7 +13,8 @@ from pathlib import Path
 from rag_config import DEFAULT_CATALOG, parse_catalog, resolve_dataset_config, resolve_paths, ensure_dirs, now_iso
 from rag_query import answer
 from rag_scraper import scrape_pages
-from rag_embedding import build_index
+from rag_embedding import build_index as build_index_tf
+from rag_embedding_st import build_index as build_index_st
 
 
 def run_ingest(
@@ -26,6 +27,8 @@ def run_ingest(
     overwrite: bool = False,
     ask_delay: float | None = None,
     same_host_only: bool = False,
+    resume: bool = False,
+    retry_failed: bool = False,
 ) -> None:
     catalog = parse_catalog(catalog_path)
     config = resolve_dataset_config(catalog, source=source, dataset=dataset, ask_delay=ask_delay)
@@ -35,12 +38,20 @@ def run_ingest(
     if not run_id:
         run_id = now_iso().replace(":", "").replace("-", "").replace("T", "_")
 
-    if paths.index_path(run_id).exists() and not overwrite:
+    if paths.index_path(run_id).exists() and not overwrite and not resume:
         raise RuntimeError(
             f"Index already exists for run_id={run_id}. Use --overwrite or a different --run-id."
         )
 
-    scrape_result = scrape_pages(config, paths, limit=limit, dry_run=dry_run, same_host_only=same_host_only)
+    scrape_result = scrape_pages(
+        config,
+        paths,
+        limit=limit,
+        dry_run=dry_run,
+        same_host_only=same_host_only,
+        resume=resume,
+        retry_failed=retry_failed,
+    )
     print(f"Parsed {scrape_result['url_count']} urls from sitemap")
 
     if dry_run:
@@ -66,7 +77,10 @@ def run_ingest(
         paths.sitemap_manifest.write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
         raise RuntimeError("No chunks created; all fetched pages were empty or failed.")
 
-    build_index(config, paths, run_id, pages)
+    if config.embedding_provider in {"st", "sentence_transformers", "sentence-transformer", "sentence-transformers"}:
+        build_index_st(config, paths, run_id, pages)
+    else:
+        build_index_tf(config, paths, run_id, pages)
     manifest = {
         "source": config.source,
         "dataset": config.dataset,
@@ -94,6 +108,7 @@ def run_ask(
     top_k: int | None = None,
     run_id: str | None = None,
     catalog_path: Path = DEFAULT_CATALOG,
+    ollama_model: str = "qwen3.5:9b",
 ) -> None:
     catalog = parse_catalog(catalog_path)
     source_name = source or catalog["default_source"]
@@ -108,6 +123,7 @@ def run_ask(
         top_k=selected_top_k,
         catalog_path=catalog_path,
         run_id=run_id,
+        ollama_model=ollama_model,
     )
 
 
@@ -125,6 +141,8 @@ def main() -> None:
     ingest_parser.add_argument("--overwrite", action="store_true")
     ingest_parser.add_argument("--ask-delay", type=float)
     ingest_parser.add_argument("--same-host-only", action="store_true")
+    ingest_parser.add_argument("--resume", action="store_true")
+    ingest_parser.add_argument("--retry-failed", action="store_true")
 
     ask_parser = sub.add_parser("ask")
     ask_parser.add_argument("question", nargs="?")
@@ -133,6 +151,7 @@ def main() -> None:
     ask_parser.add_argument("--top-k", type=int)
     ask_parser.add_argument("--run-id")
     ask_parser.add_argument("--catalog", default=str(DEFAULT_CATALOG))
+    ask_parser.add_argument("--ollama-model", default="qwen3.5:9b")
 
     args = parser.parse_args()
 
@@ -147,6 +166,8 @@ def main() -> None:
             overwrite=args.overwrite,
             ask_delay=args.ask_delay,
             same_host_only=args.same_host_only,
+            resume=args.resume,
+            retry_failed=args.retry_failed,
         )
     elif args.cmd == "ask":
         question = args.question
@@ -161,6 +182,7 @@ def main() -> None:
             top_k=args.top_k,
             run_id=args.run_id,
             catalog_path=Path(args.catalog),
+            ollama_model=args.ollama_model,
         )
 
 
