@@ -8,7 +8,7 @@ A source-aware local RAG ingest/playground for learning and experiments.
   - `ask` command for retrieval against indexed chunks
 - `rag_practice/rag_scraper.py` for sitemap/page scraping
 - `rag_practice/rag_embedding.py` for chunking and index/vector building
-- `rag_practice/rag_query.py` for retrieval/score computation
+- `rag_practice/rag_query.py` for retrieval + Ollama article answer generation
 - `rag_practice/data/catalog.json`
   - source and dataset configuration
 - Structured artifact directories for future datasets:
@@ -62,6 +62,33 @@ python3 rag_playground.py ask "What are the key parts of a RAG system?"
 
 ```bash
 python3 rag_playground.py ask "What is RAG?" --source selfstudys --dataset jee --run-id baseline_20260301 --top-k 5
+```
+
+5. Query with the lightweight `rag_query.py` CLI (recommended defaults):
+
+```bash
+python3 rag_query.py "What is JEE?"
+```
+
+Defaults used by `rag_query.py`:
+- `--source selfstudys`
+- `--dataset jee`
+- `--top-k 5`
+- `--ollama-model qwen3.5:9b`
+- thinking/reasoning text disabled by default
+
+Useful options:
+- print the full prompt being sent:
+```bash
+python3 rag_query.py "What is JEE?" --print-prompt
+```
+- enable reasoning output if you want it:
+```bash
+python3 rag_query.py "What is JEE?" --enable-thinking
+```
+- run smoke test without index files:
+```bash
+python3 rag_query.py --smoke-test --ollama-model qwen3.5:9b
 ```
 
 ## Adding a new sitemap source later

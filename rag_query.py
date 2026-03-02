@@ -1,8 +1,16 @@
 """Query/retrieval CLI for the RAG playground.
 
 Usage:
+  python3 rag_query.py "your question"
   python3 rag_query.py "your question" [--source S] [--dataset D] [--top-k K]
-  python3 rag_query.py --smoke-test
+  python3 rag_query.py --smoke-test [--ollama-model qwen3.5:9b]
+
+Defaults:
+  --source selfstudys
+  --dataset jee
+  --top-k 5
+  --ollama-model qwen3.5:9b
+  thinking disabled (use --enable-thinking to allow it)
 """
 from __future__ import annotations
 
